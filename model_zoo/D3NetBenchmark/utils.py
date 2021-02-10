@@ -57,7 +57,7 @@ def get_scheduler(mode, optimizer, kwargs):
         return  torch.optim.lr_scheduler.MultiStepLR(optimizer, **kwargs)
 
 ########################################[ Evaluator ]########################################
-import numpy as np 
+import numpy as np
 from PIL import Image
 import cv2
 import os
@@ -71,7 +71,7 @@ def eval_pr(y_pred, y, num):
         prec[i], recall[i] = tp / (y_temp.sum() + 1e-20), tp / (y.sum() + 1e-20)
     return prec, recall
 
-def f_measure(pred,gt):
+def f_measure(pred, gt):
     beta2 = 0.3
     with torch.no_grad():
         pred = torch.from_numpy(pred).float().cuda()
@@ -79,28 +79,29 @@ def f_measure(pred,gt):
 
         prec, recall = eval_pr(pred, gt, 255)
         f_score = (1 + beta2) * prec * recall / (beta2 * prec + recall)
-        f_score[f_score != f_score] = 0 # for Nan
+        f_score[f_score != f_score] = 0  # for Nan
     return f_score
 
-def get_metric(sample_batched, result,result_save_path=None,if_recover=True):
-    id=sample_batched['meta']['id'][0]
-    gt=np.array(Image.open(sample_batched['meta']['gt_path'][0]).convert('L'))/255.0
+
+def get_metric(sample_batched, result, result_save_path=None, if_recover=True):
+    id = sample_batched['meta']['id'][0]
+    gt = np.array(Image.open(sample_batched['meta']['gt_path'][0]).convert('L'))/255.0
 
     if if_recover:
-        result=cv2.resize(result, gt.shape[::-1], interpolation=cv2.INTER_LINEAR) 
+        result = cv2.resize(result, gt.shape[::-1], interpolation=cv2.INTER_LINEAR)
     else:
-        gt=cv2.resize(gt, result.shape[::-1], interpolation=cv2.INTER_NEAREST)
+        gt = cv2.resize(gt, result.shape[::-1], interpolation=cv2.INTER_NEAREST)
 
-    result=(result*255).astype(np.uint8)
+    result = (result*255).astype(np.uint8)
 
     if result_save_path is not None:
-        Image.fromarray(result).save(os.path.join(result_save_path,id+'.png'))
+        Image.fromarray(result).save(os.path.join(result_save_path, id+'.png'))
 
-    result=result.astype(np.float64)/255.0
+    result = result.astype(np.float64)/255.0
 
-    mae= np.mean(np.abs(result-gt))
-    f_score=f_measure(result,gt)
-    return mae,f_score
+    mae = np.mean(np.abs(result-gt))
+    f_score = f_measure(result, gt)
+    return mae, f_score
 
 def metric_better_than(metric_a, metric_b):
     if metric_b is None:

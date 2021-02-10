@@ -1,9 +1,9 @@
-#pytorch 
+#pytorch
 import torch
 import torchvision
 from torch.utils.data import DataLoader
 
-#general 
+#general
 import os
 import cv2
 import sys
@@ -48,7 +48,7 @@ p['val_datasets']=[p['datasets_path']+'TestingSet/NJU2K_TEST']
 p['gpu_ids']=list(range(torch.cuda.device_count()))
 p['start_epoch']=0
 p['epochs']=30
-p['bs']=8*len(p['gpu_ids'])  
+p['bs']=8*len(p['gpu_ids'])
 p['lr']=1.25e-5*(p['bs']/len(p['gpu_ids']))
 p['num_workers']=4*len(p['gpu_ids'])
 
@@ -92,19 +92,19 @@ class Trainer(object):
         self.p=p
         os.makedirs(p['snapshot_path'],exist_ok=True)
         shutil.copyfile(os.path.join('model',p['model']+'.py'), os.path.join(p['snapshot_path'],p['model']+'.py'))
-        SetLogFile('{}/log.txt'.format(p['snapshot_path']))  
+        SetLogFile('{}/log.txt'.format(p['snapshot_path']))
         if p['if_use_tensorboard']:
             self.writer = SummaryWriter(p['snapshot_path'])
-            
-        transform_train = torchvision.transforms.Compose([  
+
+        transform_train = torchvision.transforms.Compose([
                                                             mtr.RandomFlip(),
                                                             mtr.Resize(p['size']),
                                                             mtr.ToTensor(),
                                                             mtr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],elems_do=['img']),
-                                                            
+
                                                          ])
 
-        transform_val = torchvision.transforms.Compose([  
+        transform_val = torchvision.transforms.Compose([
                                                     mtr.Resize(p['size']),
                                                     mtr.ToTensor(),
                                                     mtr.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225],elems_do=['img']),
@@ -119,7 +119,7 @@ class Trainer(object):
             self.val_loaders.append(DataLoader(val_set, batch_size=1, shuffle=False,pin_memory=True))
 
         self.model=MyNet()
-    
+
         self.model = self.model.cuda()
 
         self.optimizer = utils.get_optimizer(p['optimizer'][0], self.model.get_train_params(lr=p['lr']), p['optimizer'][1])
@@ -154,17 +154,17 @@ class Trainer(object):
             if p['train_only_epochs']>=0:
                 self.training(epoch)
                 self.scheduler.step()
-            
+
             if epoch<p['train_only_epochs']: continue
             #validation
             if (epoch+1) % p['val_interval']==0:
                 self.validation(epoch)
-        
+
         if self.p['if_use_tensorboard']:self.writer.close()
         print('-'*79+'\nEnd time : ', time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
 
 
-    def training(self, epoch): 
+    def training(self, epoch):
         print('Training :')
         loss_total = 0
         self.model.train()
@@ -182,7 +182,7 @@ class Trainer(object):
         print('Loss: %.3f' % (loss_total / (i + 1)))
         if self.p['if_use_tensorboard']:self.writer.add_scalar('Loss/train', (loss_total / (i + 1)), epoch)
 
- 
+
     def validation(self, epoch, result_save_path=None):
         print('Validation :')
         self.model.eval()
@@ -198,31 +198,31 @@ class Trainer(object):
 
             loss_total = 0
             tbar = tqdm(val_loader)
-            
+
             mae_avg,f_score_avg=0,0
             for i, sample_batched in enumerate(tbar):
                 input = self.model.get_input(sample_batched)
                 gt = self.model.get_gt(sample_batched)
-                with torch.no_grad(): 
+                with torch.no_grad():
                     output = self.model(input)
                 loss = self.model.get_loss(output, gt)
                 loss_total+=loss.item()
                 tbar.set_description('Loss: {:.3f}'.format(loss_total/(i + 1)))
                 result = self.model.get_result(output)
 
-                mae,f_score=utils.get_metric(sample_batched, result,result_save_path_tmp)
+                mae,f_score=utils.get_metric(sample_batched, result, result_save_path_tmp)
                 mae_avg,f_score_avg=mae_avg+mae,f_score_avg+f_score
 
             print('Loss: %.3f' % (loss_total / (i + 1)))
             mae_avg,f_score_avg=mae_avg/len(tbar),f_score_avg/len(tbar)
-            
+
             metric =  np.array([mae_avg, f_score_avg.max().item()])
             print('[{}]-> mae:{:.4f} f_max:{:.4f}'.format(dataset,metric[0],metric[1]))
 
             metric_all+=metric
 
         metric_all=metric_all/len(self.val_loaders)
-    
+
         is_best = utils.metric_better_than(metric_all, self.best_metric)
         self.best_metric = metric_all if is_best else self.best_metric
 
@@ -240,14 +240,14 @@ class Trainer(object):
             torch.save(pth_state, os.path.join(self.p['snapshot_path'], 'checkpoint.pth'))
         if is_best:
             torch.save(pth_state, os.path.join(self.p['snapshot_path'], 'best.pth'))
-        
+
         if self.p['if_use_tensorboard']:
             self.writer.add_scalar('Loss/test', (loss_total / (i + 1)), epoch)
             self.writer.add_scalar('Metric/mae', metric_all[0], epoch)
             self.writer.add_scalar('Metric/f_max', metric_all[1], epoch)
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     mine =Trainer(p)
     mine.main()
 
