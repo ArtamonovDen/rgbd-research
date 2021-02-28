@@ -1,10 +1,10 @@
 
 import wandb
-import enum
-import tqdm
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torchvision
+from enum import Enum
 from torch.utils.data import DataLoader
 
 from model.DepthNet import MyNet as DepthNetModel
@@ -16,7 +16,7 @@ import utils
 from dataloader_rgbdsod import RgbdSodDataset
 
 
-class D3NetModels(enum):
+class D3NetModels(Enum):
     DepthNet = 'DepthNet'
     RgbNet = 'RgbNet'
     RgbdNet = 'RgbdNet'
@@ -25,14 +25,14 @@ class D3NetModels(enum):
 config = dict(
     model_name='D3Net',
     backbone_path='./model/vgg16_feat.pth',
-    D3Net_model=D3NetModels.DepthNet,
+    D3Net_model=D3NetModels.DepthNet.value,
     data_normalize_mean=[0.485, 0.456, 0.406],
     data_normalize_std=[0.229, 0.224, 0.225],
     data_size=(224, 224),
-    batch_size=128,
-    epocs=10,
-    train_datasets=['NJU2K_TRAIN'],
-    val_datasets=['NJU2K_TRAIN'],
+    batch_size=1,
+    epochs=10,
+    train_datasets=['./datasets/NJU2K_TRAIN'],
+    val_datasets=['./datasets/NJU2K_TRAIN'],
     val_interval=5,
     optimizer='Adam',
     optimizer_params={'weight_decay': 0, 'betas': [0.9, 0.99]},
@@ -40,7 +40,7 @@ config = dict(
     scheduler_params={}
     )
 
-config['learning_rate'] = 1.25e-5*(config['train_datasets'])
+config['learning_rate'] = 1.25e-5*(config['batch_size'])
 
 
 def make_train_data_loader(config):
@@ -77,11 +77,11 @@ def make_val_data_loader(config):
 
 def make_model(model_name, backbone_path):
 
-    if model_name == D3NetModels.DepthNet:
+    if model_name == D3NetModels.DepthNet.value:
         return DepthNetModel(backbone_path)
-    if model_name == D3NetModels.RgbNet:
+    if model_name == D3NetModels.RgbNet.value:
         return RgbNetModel(backbone_path)
-    if model_name == D3NetModels.RgbdNet:
+    if model_name == D3NetModels.RgbdNet.value:
         return RgbdNetModel(backbone_path)
 
 
@@ -124,7 +124,8 @@ def model_pipeline(hyperparameters):
 
     with wandb.init(project="pytorch-demo", config=hyperparameters):
         config = wandb.config
-        model = make_model(config.D3Net_model, config.backbone_path).to(device)
+        model = make_model(config.D3Net_model, config.backbone_path)
+        model = model.to(device)
 
         train_loader = make_train_data_loader(config)
         val_loaders = make_val_data_loader(config)
@@ -136,7 +137,7 @@ def model_pipeline(hyperparameters):
         # Train
         wandb.watch(model, criterion, log="all", log_freq=10)
         example_ct = 0
-        for epoch in tqdm(range(config.epoch)):
+        for epoch in tqdm(range(config.epochs)):
             loss_total = 0
             model.train()
             for i, sample_batched in enumerate(tqdm(train_loader)):
@@ -161,7 +162,5 @@ def model_pipeline(hyperparameters):
     return model
 
 
-
-
 if __name__ == '__main__':
-    pass
+    model_pipeline(config)
