@@ -1,6 +1,7 @@
 
 import wandb
 import enum
+import tqdm
 import torch
 import torch.nn as nn
 import torchvision
@@ -13,6 +14,7 @@ from model.RgbNet import MyNet as RgbdNetModel
 import my_custom_transforms as mtr
 import utils
 from dataloader_rgbdsod import RgbdSodDataset
+
 
 class D3NetModels(enum):
     DepthNet = 'DepthNet'
@@ -28,8 +30,10 @@ config = dict(
     data_normalize_std=[0.229, 0.224, 0.225],
     data_size=(224, 224),
     batch_size=128,
+    epocs=10,
     train_datasets=['NJU2K_TRAIN'],
     val_datasets=['NJU2K_TRAIN'],
+    val_interval=5,
     optimizer='Adam',
     optimizer_params={'weight_decay': 0, 'betas': [0.9, 0.99]},
     scheduler_type='Constant',
@@ -81,6 +85,39 @@ def make_model(model_name, backbone_path):
         return RgbdNetModel(backbone_path)
 
 
+def train_log(loss, example_ct, epoch):
+    loss = float(loss)
+    wandb.log({'epoch': epoch, 'loss': loss}, step=example_ct)
+    print(f'Loss after {str(example_ct).zfill(5)}  examples: {loss:.3f}')
+
+
+def test(model, criterion, val_loader, device):
+    model.eval()
+
+    # Run the model on some test examples
+    with torch.no_grad():
+        loss_total = 0
+        mae_avg, f_score_avg = 0, 0
+        tbar = tqdm(val_loader)
+        for i, sample_batched in enumerate(tbar):
+            rgb, dep, gt = sample_batched['img'].to(device), sample_batched['depth'].to(device), sample_batched['gt'].to(device)
+            output = model((rgb, dep))
+            loss = criterion(output, gt)
+            loss_total += loss.item()
+
+            result = model.get_result(output)
+            mae, f_score = utils.get_metric(sample_batched, result)
+            mae_avg, f_score_avg = mae_avg + mae, f_score_avg + f_score
+
+        print('Loss: %.3f' % (loss_total / (i + 1)))
+        mae_avg, f_score_avg = mae_avg/len(tbar), f_score_avg/len(tbar)
+        print(f'mae:{mae_avg:.4f} f_max:{f_score_avg.max().item():.4f}')
+
+    # Save the model in the exchangeable ONNX format
+    torch.onnx.export(model, sample_batched, "d3net_model.onnx")
+    wandb.save("d3net_model.onnx")
+
+
 def model_pipeline(hyperparameters):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -94,22 +131,36 @@ def model_pipeline(hyperparameters):
 
         optimizer = utils.get_optimizer(config.optimizer, model.parameters(), config.learning_rate, config.optimizer_params)
         scheduler = utils.get_scheduler(config.scheduler_type, optimizer, config.scheduler_params)
-
-        # TODO firstly criterion ?
-
         criterion = nn.BCELoss()  # TODO should we use .cuda() ?
 
+        # Train
+        wandb.watch(model, criterion, log="all", log_freq=10)
+        example_ct = 0
+        for epoch in tqdm(range(config.epoch)):
+            loss_total = 0
+            model.train()
+            for i, sample_batched in enumerate(tqdm(train_loader)):
+                optimizer.zero_grad()
 
-        model, train_loader, test_loader, criterion, optimizer = make(config)
-        print(model)
+                rgb, dep, gt = sample_batched['img'].to(device), sample_batched['depth'].to(device), sample_batched['gt'].to(device)
+                output = model((rgb, dep))
+                loss = criterion(output, gt)
+                loss_total += loss.item()
+                loss.backward()
+                optimizer.step()
+                example_ct += len(sample_batched)
 
-      # and use them to train the model
-        train(model, train_loader, criterion, optimizer, config)
+                if (i+1 % 25) == 0:
+                    train_log(loss, example_ct, epoch)
 
-      # and test its final performance
-        test(model, test_loader)
+            scheduler.step()
+
+        # Test
+        test(model, criterion, val_loaders[0], device)
 
     return model
+
+
 
 
 if __name__ == '__main__':
