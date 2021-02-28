@@ -11,7 +11,7 @@ def init_weight(model):
             if m.bias is not None:
                 fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(m.weight)
                 bound = 1 / math.sqrt(fan_in)
-                torch.nn.init.uniform_(m.bias, -bound, bound) 
+                torch.nn.init.uniform_(m.bias, -bound, bound)
         elif isinstance(m, nn.BatchNorm2d):
             m.weight.data.fill_(1)
             m.bias.data.zero_()
@@ -41,9 +41,9 @@ class Decoder(nn.Module):
 
 
 class Single_Stream(nn.Module):
-    def __init__(self,in_channel=3):
+    def __init__(self, in_channel=3, backbone_path='./model/vgg16_feat.pth'):
         super(Single_Stream, self).__init__()
-        self.backbone =  VGG_backbone(in_channel=in_channel,pre_train_path='./model/vgg16_feat.pth')
+        self.backbone = VGG_backbone(in_channel=in_channel, pre_train_path=backbone_path)
         self.toplayer = nn.Sequential(
             nn.AvgPool2d(2, stride=2),
             nn.Conv2d(512, 32, kernel_size=3, stride=1, padding=1),
@@ -88,7 +88,7 @@ class PredLayer(nn.Module):
             nn.Sigmoid()
         )
         init_weight(self)
-        
+
     def forward(self, x):
         x = self.enlayer(x)
         x = self.outlayer(x)
@@ -96,11 +96,11 @@ class PredLayer(nn.Module):
 
 
 class MyNet(nn.Module):
-    def __init__(self):
+    def __init__(self, backbone_path='./model/vgg16_feat.pth'):
         super(MyNet, self).__init__()
 
         # Main-streams
-        self.main_stream = Single_Stream(in_channel=3)
+        self.main_stream = Single_Stream(in_channel=3, backbone_path=backbone_path)
 
         # Prediction
         self.pred_layer = PredLayer()
@@ -118,15 +118,15 @@ class MyNet(nn.Module):
     def get_train_params(self, lr):
         train_params = [{'params': self.parameters(), 'lr': lr}]
         return train_params
-    
+
     def get_input(self, sample_batched):
         rgb,dep = sample_batched['img'].cuda(),sample_batched['depth'].cuda()
         return rgb,dep
-    
+
     def get_gt(self, sample_batched):
         gt = sample_batched['gt'].cuda()
         return gt
-    
+
     def get_result(self, output, index=0):
         if isinstance(output, list):
             result = output[0].data.cpu().numpy()[index,0,:,:]
@@ -138,7 +138,7 @@ class MyNet(nn.Module):
         # else:
         #     result = torch.sigmoid(output.data.cpu()).numpy()[index,0,:,:]
         return result
-    
+
     def get_loss(self, output, gt, if_mean=True):
         criterion = nn.BCELoss().cuda()
         #criterion = nn.BCEWithLogitsLoss().cuda()

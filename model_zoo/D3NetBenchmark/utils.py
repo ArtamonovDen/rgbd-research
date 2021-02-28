@@ -6,20 +6,22 @@ import os
 ########################################[ Optimizer ]########################################
 
 
-def get_optimizer(mode, train_params, kwargs):
-    opt_default = {'SGD' : {'momentum':0.9, 'weight_decay':5e-4, 'nesterov':False},
-                   #'Adam' : {'weight_decay':5e-4, 'betas':[0.9, 0.99]},
-                    'Adam' : {'weight_decay':0, 'betas':[0.9, 0.99]},
-                    'TBD' : {}   }
+def get_optimizer(mode, train_params, lr, kwargs):
+    opt_default = {
+        'SGD': {'momentum': 0.9, 'weight_decay': 5e-4, 'nesterov': False},
+        # 'Adam' : {'weight_decay':5e-4, 'betas':[0.9, 0.99]},
+        'Adam': {'weight_decay': 0, 'betas': [0.9, 0.99]},
+        'TBD': {}
+        }
 
     for k in opt_default[mode].keys():
         if k not in kwargs.keys():
             kwargs[k] = opt_default[mode][k]
 
-    if mode=='SGD':
-        return  torch.optim.SGD(train_params,**kwargs)
-    elif mode=='Adam':
-        return torch.optim.Adam(train_params,**kwargs)
+    if mode == 'SGD':
+        return torch.optim.SGD(train_params, lr=lr, **kwargs)
+    elif mode == 'Adam':
+        return torch.optim.Adam(train_params, lr=lr, **kwargs)
 
 
 ########################################[ Scheduler ]########################################

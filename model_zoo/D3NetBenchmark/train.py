@@ -35,13 +35,13 @@ def SetLogFile(file_path='log'):
     sys.stdout = Logger(file_path, sys.stdout)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--net', type=str, default='RgbNet',choices=['RgbNet','RgbdNet','DepthNet'],help='train net')
+parser.add_argument('--net', type=str, default='DepthNet',choices=['RgbNet','RgbdNet','DepthNet'],help='train net')
 args = parser.parse_args()
 
 utils.set_seed(10)
 
 p={}
-p['datasets_path']='./dataset/'
+p['datasets_path']='./datasets/'
 p['train_datasets']=[p['datasets_path']+'TrainingSet/NJU2K_TRAIN',p['datasets_path']+'TrainingSet/NLPR_TRAIN']
 p['val_datasets']=[p['datasets_path']+'TestingSet/NJU2K_TEST']
 
@@ -91,7 +91,7 @@ class Trainer(object):
     def __init__(self,p):
         self.p=p
         os.makedirs(p['snapshot_path'],exist_ok=True)
-        shutil.copyfile(os.path.join('model',p['model']+'.py'), os.path.join(p['snapshot_path'],p['model']+'.py'))
+        shutil.copyfile(os.path.join('model_zoo/D3NetBenchmark/model',p['model']+'.py'), os.path.join(p['snapshot_path'],p['model']+'.py'))
         SetLogFile('{}/log.txt'.format(p['snapshot_path']))
         if p['if_use_tensorboard']:
             self.writer = SummaryWriter(p['snapshot_path'])
@@ -122,7 +122,7 @@ class Trainer(object):
 
         self.model = self.model.cuda()
 
-        self.optimizer = utils.get_optimizer(p['optimizer'][0], self.model.get_train_params(lr=p['lr']), p['optimizer'][1])
+        self.optimizer = utils.get_optimizer(p['optimizer'][0], self.model.parameters(), p['lr'], p['optimizer'][1])
         self.scheduler = utils.get_scheduler(p['scheduler'][0], self.optimizer, p['scheduler'][1])
 
         self.best_metric=None
@@ -173,7 +173,7 @@ class Trainer(object):
             self.optimizer.zero_grad()
             input = self.model.get_input(sample_batched)
             gt = self.model.get_gt(sample_batched)
-            output = self.model(input)
+            output = self.model(input) # tensor: batch x 1 x 224 x 224
             loss = self.model.get_loss(output, gt)
             loss_total+=loss.item()
             loss.backward()
