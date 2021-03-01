@@ -14,10 +14,10 @@ def img_rotate(img, angle, center=None, if_expand=False, scale=1.0, mode=None):
     if mode is None: mode=cv2.INTER_LINEAR if len(img.shape)==3 else cv2.INTER_NEAREST
     if if_expand:
         h_new=int(w*math.fabs(math.sin(math.radians(angle)))+h*math.fabs(math.cos(math.radians(angle))))
-        w_new=int(h*math.fabs(math.sin(math.radians(angle)))+w*math.fabs(math.cos(math.radians(angle)))) 
-        M[0,2] +=(w_new-w)/2 
-        M[1,2] +=(h_new-h)/2 
-        h, w =h_new, w_new  
+        w_new=int(h*math.fabs(math.sin(math.radians(angle)))+w*math.fabs(math.cos(math.radians(angle))))
+        M[0,2] +=(w_new-w)/2
+        M[1,2] +=(h_new-h)/2
+        h, w =h_new, w_new
     rotated = cv2.warpAffine(img, M, (w, h),flags=mode)
     return rotated
 
@@ -28,10 +28,10 @@ def img_rotate_point(img, angle, center=None, if_expand=False, scale=1.0):
     M = cv2.getRotationMatrix2D(center, angle, scale)
     if if_expand:
         h_new=int(w*math.fabs(math.sin(math.radians(angle)))+h*math.fabs(math.cos(math.radians(angle))))
-        w_new=int(h*math.fabs(math.sin(math.radians(angle)))+w*math.fabs(math.cos(math.radians(angle)))) 
-        M[0,2] +=(w_new-w)/2 
-        M[1,2] +=(h_new-h)/2 
-        h, w =h_new, w_new  
+        w_new=int(h*math.fabs(math.sin(math.radians(angle)))+w*math.fabs(math.cos(math.radians(angle))))
+        M[0,2] +=(w_new-w)/2
+        M[1,2] +=(h_new-h)/2
+        h, w =h_new, w_new
 
 
     pts_y, pts_x= np.where(img==1)
@@ -83,7 +83,7 @@ class Transform(object):
             tmp = self.transform(Image.fromarray(sample[elem]))
             sample[elem] = np.array(tmp) if self.if_numpy else tmp
         return sample
-    
+
 
 class ToPilImage(object):
     def __init__(self, elems_do=None, elems_undo=[]):
@@ -130,13 +130,13 @@ class ToTensor(object):
             tmp = tmp[np.newaxis,:,:] if tmp.ndim == 2 else tmp.transpose((2, 0, 1))
             tmp = torch.from_numpy(tmp).float()
             tmp = tmp.float().div(255) if self.if_div else tmp
-            sample[elem] = tmp                          
+            sample[elem] = tmp
         return sample
 
 
 class Normalize(object):
     def __init__(self, mean, std, elems_do=None, elems_undo=[]):
-        self.mean, self.std = mean, std 
+        self.mean, self.std = mean, std
         self.elems_do, self.elems_undo = elems_do, (['meta']+elems_undo)
     def __call__(self, sample):
         for elem in sample.keys():
@@ -149,7 +149,7 @@ class Normalize(object):
             #print(tensor.min(),tensor.max())
 
         return sample
-    
+
 
 class Show(object):
     def __init__(self, elems_show=['img','gt'], elems_do=None, elems_undo=[]):
@@ -181,7 +181,7 @@ class RandomFlip(object):
             for elem in sample.keys():
                 if self.elems_do!= None  and elem not in self.elems_do :continue
                 if elem in self.elems_undo:continue
-                sample[elem]= np.array(Image.fromarray(sample[elem]).transpose(self.direction)) 
+                sample[elem]= np.array(Image.fromarray(sample[elem]).transpose(self.direction))
             sample['meta']['flip']=1
         else:
             sample['meta']['flip']=0
@@ -200,12 +200,12 @@ class RandomRotation(object):
         for elem in sample.keys():
             if self.elems_do!= None  and elem not in self.elems_do :continue
             if elem in self.elems_undo:continue
-            
+
             if elem in self.elems_point:
                 sample[elem]=img_rotate_point(sample[elem], angle, if_expand=self.if_expand)
                 continue
 
-            sample[elem]=img_rotate(sample[elem], angle, if_expand=self.if_expand, mode=self.mode)  
+            sample[elem]=img_rotate(sample[elem], angle, if_expand=self.if_expand, mode=self.mode)
         return sample
 
 
@@ -223,10 +223,10 @@ class Resize(object):
                 sample[elem]=img_resize_point(sample[elem],self.size)
                 continue
 
-            if self.mode is None: 
+            if self.mode is None:
                 mode = cv2.INTER_LINEAR if len(sample[elem].shape)==3 else cv2.INTER_NEAREST
             sample[elem] = cv2.resize(sample[elem], self.size, interpolation=mode)
-            
+
         return sample
 
 
@@ -244,7 +244,7 @@ class Expand(object):
         for elem in sample.keys():
             if self.elems_do!= None  and elem not in self.elems_do :continue
             if elem in self.elems_undo:continue
-            sample[elem]=cv2.copyMakeBorder(sample[elem],self.pad[0],self.pad[1],self.pad[2],self.pad[3],cv2.BORDER_CONSTANT)  
+            sample[elem]=cv2.copyMakeBorder(sample[elem],self.pad[0],self.pad[1],self.pad[2],self.pad[3],cv2.BORDER_CONSTANT)
         return sample
 
 
@@ -259,7 +259,7 @@ class Crop(object):
             sample[elem]=sample[elem][self.y_range[0]:self.y_range[1], self.x_range[0]:self.x_range[1], ...]
 
         sample['meta']['crop_size'] = np.array((self.x_range[1]-self.x_range[0],self.y_range[1]-self.y_range[0]))
-        sample['meta']['crop_lt'] = np.array((self.x_range[0],self.y_range[0])) 
+        sample['meta']['crop_lt'] = np.array((self.x_range[0],self.y_range[0]))
         return sample
 
 
@@ -271,7 +271,7 @@ class RandomScale(object):
         scale_tmp = random.uniform(self.scale[0], self.scale[1])
         src_size=sample['gt'].shape[::-1]
         dst_size= ( int(src_size[0]*scale_tmp), int(src_size[1]*scale_tmp))
-        Resize(size=dst_size)(sample)   
+        Resize(size=dst_size)(sample)
         return sample
 
 
