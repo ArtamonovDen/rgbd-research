@@ -25,6 +25,7 @@ class D3NetModels(Enum):
 
 
 config = dict(
+    wandb_project='D3Net-project',
     model_name='D3Net',
     backbone_path='./model/vgg16_feat.pth',
     D3Net_model=D3NetModels.DepthNet.value,
@@ -32,10 +33,10 @@ config = dict(
     data_normalize_std=[0.229, 0.224, 0.225],
     data_size=(224, 224),
     batch_size=1,
-    epochs=10,
+    epochs=32,
     train_datasets=['./datasets/NJU2K_TRAIN'],
     val_datasets=['./datasets/NJU2K_TEST'],
-    val_interval=5,
+    val_interval=4,
     optimizer='Adam',
     optimizer_params={'weight_decay': 0, 'betas': [0.9, 0.99]},
     scheduler_type='Constant',
@@ -111,23 +112,27 @@ def test(model, criterion, val_loader, device):
             mae, f_score = utils.get_metric(sample_batched, result)
             mae_avg, f_score_avg = mae_avg + mae, f_score_avg + f_score
 
-            wandb.log({'loss': loss, 'mae': mae, 'f_score': f_score.max().item()}, step=i)
+            # wandb.log({'loss': loss, 'mae': mae, 'f_score': f_score.max().item()}, step=i)
 
-        print('Loss: %.3f' % (loss_total / (i + 1)))
-        mae_avg, f_score_avg = mae_avg/len(tbar), f_score_avg/len(tbar)
-        print(f'mae:{mae_avg:.4f} f_max:{f_score_avg.max().item():.4f}')
-        wandb.log({'aveloss': (loss_total / (i + 1)), 'ave_mae': mae_avg, 'f_score_ave': f_score_avg.max().item()}, step=i)
+        loss_avg, mae_avg, f_score_avg = loss_total / (i + 1), mae_avg/len(tbar), (f_score_avg/len(tbar)).max().item()
+        print(f'loss: {loss_avg:.3f} mae:{mae_avg:.4f} f_max:{f_score_avg:.4f}')
+        wandb.log({'val_ave_loss': (loss_avg), 'val_ave_mae': mae_avg, 'val_f_score_ave': f_score_avg})
 
     # Save the model in the exchangeable ONNX format
     # torch.onnx.export(model, sample_batched, "d3net_model.onnx")
     # wandb.save("d3net_model.onnx")
 
+    return mae_avg, f_score_avg
 
-def model_pipeline(hyperparameters):
+
+def model_pipeline(config):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    best_metrics = None
+    snapshot_path = 'snapshot_[{}]_[{}]'.format(time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time())), config['D3Net_model'])
+    os.makedirs(snapshot_path)
 
-    with wandb.init(project="pytorch-demo", config=hyperparameters):
+    with wandb.init(project=config['wandb_project'], config=config):
         # config = wandb.config
         model = make_model(config['D3Net_model'], config['backbone_path'])
         model = model.to(device)
@@ -162,21 +167,34 @@ def model_pipeline(hyperparameters):
 
             scheduler.step()
 
-        # Test
-        print('Start testing')
-        test(model, criterion, val_loaders[0], device)
+            if ((epoch+1) % config['val_interval']) == 0:
+                print(f'Start validation on {epoch+1} epoch')
+                mae, f_score = test(model, criterion, val_loaders[0], device)
+                if (not best_metrics) or (best_metrics and mae < best_metrics[0]):
+                    best_metrics = (mae, f_score)
+                    print(f'Dest metrics were updaeted: mae:{mae:.4f} f_max:{f_score:.4f}')
+                    print('Save best model')
+                    pth_state = {
+                        'best_metric': best_metrics,
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'scheduler': scheduler.state_dict()
+                    }
+                    torch.save(pth_state, os.path.join(snapshot_path, f'best_{config["D3Net_model"]}.pth'))
 
-        # Save model
-        print('Save model')
-        snapshot_path = 'snapshot_[{}]_[{}]'.format(time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time())), config['D3Net_model'])
-        os.makedirs(snapshot_path)
-        pth_state = {
-            'current_epoch': 0,
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'scheduler': scheduler.state_dict()
-        }
-        torch.save(pth_state, os.path.join(snapshot_path, f'best_{config["D3Net_model"]}.pth'))
+        # Test
+        print('Final test')
+        mae, f_score = test(model, criterion, val_loaders[0], device)
+        if (not best_metrics) or (best_metrics and mae < best_metrics[0]):
+            best_metrics = (mae, f_score)
+            print('Save best model')
+            pth_state = {
+                'best_metric': best_metrics,
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'scheduler': scheduler.state_dict()
+            }
+            torch.save(pth_state, os.path.join(snapshot_path, f'best_{config["D3Net_model"]}.pth'))
 
     return model
 
