@@ -15,9 +15,18 @@ Models in model zoo:
 
 Run evaluation script with calcualtion F score and MAE
 
-
 | Dataset | MAE   | F-Score |
 |---------|-------|---------|
 | SSD     | 0.062 | 0.82    |
 | DES     | 0.03  | 0.89    |
 | STERE   | 0.048 | 0.89    |
+
+### D3Net with pytorch [VGG-16 backbone](https://pytorch.org/vision/0.8/models.html#torchvision.models.vgg16)
+
+| Dataset     | MAE    | F-Score |
+|-------------|--------|---------|
+| SSD         | 0.987  | 0.787   |
+| DES         | 0.0614 | 0.822   |
+| STERE       | 0.1    | 0.792   |
+| NJU2K_TRAIN | 0.07   | 0.872   |
+| NJU2K_TEST  | 0.0869 | 0.836   |

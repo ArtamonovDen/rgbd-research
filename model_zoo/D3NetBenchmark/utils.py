@@ -1,8 +1,10 @@
 import torch
-import torch.nn as nn
 import random
-import shutil
+import torchvision
 import os
+import my_custom_transforms as mtr
+from dataloader_rgbdsod import RgbdSodDataset
+from torch.utils.data import DataLoader
 ########################################[ Optimizer ]########################################
 
 
@@ -62,7 +64,6 @@ def get_scheduler(mode, optimizer, kwargs):
 import numpy as np
 from PIL import Image
 import cv2
-import os
 
 def eval_pr(y_pred, y, num):
     prec, recall = torch.zeros(num).cuda(), torch.zeros(num).cuda()
@@ -133,3 +134,37 @@ def set_seed(seed):
 #         torch.save(state, os.path.join(path, 'checkpoint.pth'))
 #     if is_best:
 #         torch.save(state, os.path.join(path, 'best.pth'))
+
+
+########################################[ Data Loaders ]########################################
+
+def make_train_data_loader(config):
+    transform_train = torchvision.transforms.Compose([
+        mtr.RandomFlip(),
+        mtr.Resize(tuple(config['data_size'])),
+        mtr.ToTensor(),
+        mtr.Normalize(config['data_normalize_mean'], config['data_normalize_std'], elems_do=['img']),
+    ])
+
+    # TODO maxnum ?, num_workers ?
+
+    train_set = RgbdSodDataset(datasets=config['train_datasets'], transform=transform_train, max_num=0, if_memory=False)
+    train_loader = DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=4, pin_memory=True)
+
+    return train_loader
+
+
+def make_val_data_loader(config):
+    transform_val = torchvision.transforms.Compose([
+        mtr.Resize(tuple(config['data_size'])),
+        mtr.ToTensor(),
+        mtr.Normalize(config['data_normalize_mean'], config['data_normalize_std'], elems_do=['img']),
+    ])
+
+    val_loaders = list()
+
+    for val_dataset in config['val_datasets']:
+        val_set = RgbdSodDataset(val_dataset, transform=transform_val, max_num=0, if_memory=False)
+        val_loaders.append(DataLoader(val_set, batch_size=1, shuffle=False, pin_memory=True))
+
+    return val_loaders

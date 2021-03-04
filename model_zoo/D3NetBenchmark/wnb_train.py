@@ -1,21 +1,17 @@
-
 import wandb
 import os
 import time
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-import torchvision
 from enum import Enum
-from torch.utils.data import DataLoader
 
 from model.DepthNet import MyNet as DepthNetModel
 from model.RgbdNet import MyNet as RgbNetModel
 from model.RgbNet import MyNet as RgbdNetModel
 
-import my_custom_transforms as mtr
 import utils
-from dataloader_rgbdsod import RgbdSodDataset
+from utils import make_val_data_loader, make_train_data_loader
 
 
 class D3NetModels(Enum):
@@ -28,11 +24,11 @@ config = dict(
     wandb_project='D3Net-project',
     model_name='D3Net',
     backbone_path='./model/vgg16_feat.pth',
-    D3Net_model=D3NetModels.DepthNet.value,
+    D3Net_model='DepthNet',
     data_normalize_mean=[0.485, 0.456, 0.406],
     data_normalize_std=[0.229, 0.224, 0.225],
     data_size=(224, 224),
-    batch_size=1,
+    batch_size=8,
     epochs=32,
     train_datasets=['./datasets/NJU2K_TRAIN'],
     val_datasets=['./datasets/NJU2K_TEST'],
@@ -44,38 +40,6 @@ config = dict(
     )
 
 config['learning_rate'] = 1.25e-5*(config['batch_size'])
-
-
-def make_train_data_loader(config):
-    transform_train = torchvision.transforms.Compose([
-        mtr.RandomFlip(),
-        mtr.Resize(tuple(config['data_size'])),
-        mtr.ToTensor(),
-        mtr.Normalize(config['data_normalize_mean'], config['data_normalize_std'], elems_do=['img']),
-    ])
-
-    # TODO maxnum ?, num_workers ?
-
-    train_set = RgbdSodDataset(datasets=config['train_datasets'], transform=transform_train, max_num=0, if_memory=False)
-    train_loader = DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=4, pin_memory=True)
-
-    return train_loader
-
-
-def make_val_data_loader(config):
-    transform_val = torchvision.transforms.Compose([
-        mtr.Resize(tuple(config['data_size'])),
-        mtr.ToTensor(),
-        mtr.Normalize(config['data_normalize_mean'], config['data_normalize_std'], elems_do=['img']),
-    ])
-
-    val_loaders = list()
-
-    for val_dataset in config['val_datasets']:
-        val_set = RgbdSodDataset(val_dataset, transform=transform_val, max_num=0, if_memory=False)
-        val_loaders.append(DataLoader(val_set, batch_size=1, shuffle=False, pin_memory=True))
-
-    return val_loaders
 
 
 def make_model(model_name, backbone_path):
@@ -111,8 +75,6 @@ def test(model, criterion, val_loader, device):
             result = model.get_result(output)
             mae, f_score = utils.get_metric(sample_batched, result)
             mae_avg, f_score_avg = mae_avg + mae, f_score_avg + f_score
-
-            # wandb.log({'loss': loss, 'mae': mae, 'f_score': f_score.max().item()}, step=i)
 
         loss_avg, mae_avg, f_score_avg = loss_total / (i + 1), mae_avg/len(tbar), (f_score_avg/len(tbar)).max().item()
         print(f'loss: {loss_avg:.3f} mae:{mae_avg:.4f} f_max:{f_score_avg:.4f}')
