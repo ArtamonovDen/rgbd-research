@@ -1,4 +1,6 @@
 wandb/
+papers/
+datasets/
 *.png
 *.jpg
 *.pth
