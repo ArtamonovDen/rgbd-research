@@ -30,3 +30,14 @@ Run evaluation script with calcualtion F score and MAE
 | STERE       | 0.1    | 0.792   |
 | NJU2K_TRAIN | 0.07   | 0.872   |
 | NJU2K_TEST  | 0.0869 | 0.836   |
+
+### BBS-Net
+
+| Dataset    | MAE   | F-Score |
+|------------|-------|---------|
+| NJU2K_TEST | 0.036 | 0.903   |
+| NLPR_TEST  | 0.042 | 0.835   |
+| DES        | 0.02  | 0.913   |
+| SSD        | 0.047 | 0.837   |
+| LFSD       | 0.073 | 0.846   |
+| SIP        | 0.047 | 0.869   |
