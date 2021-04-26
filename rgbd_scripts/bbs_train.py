@@ -27,6 +27,7 @@ def init_wnb_config(args_):
         model_name=args_.model,
         epochs=args_.epoch,
         lr=args_.lr,
+        input_size=args_.input_size,
         batch_size=args_.batch_size,
         clip=args_.clip,
         decay_rate=args_.decay_rate,
