@@ -65,18 +65,18 @@ def randomPeper(img):
     noiseNum=int(0.0015*img.shape[0]*img.shape[1])
     for i in range(noiseNum):
 
-        randX=random.randint(0,img.shape[0]-1)  
+        randX=random.randint(0,img.shape[0]-1)
 
-        randY=random.randint(0,img.shape[1]-1)  
+        randY=random.randint(0,img.shape[1]-1)
 
-        if random.randint(0,1)==0:  
+        if random.randint(0,1)==0:
 
-            img[randX,randY]=0  
+            img[randX,randY]=0
 
-        else:  
+        else:
 
-            img[randX,randY]=255 
-    return Image.fromarray(img)  
+            img[randX,randY]=255
+    return Image.fromarray(img)
 
 # dataset for training
 #The current loader is not using the normalized depth maps for training and test. If you use the normalized depth maps
@@ -116,7 +116,7 @@ class SalObjDataset(data.Dataset):
         image = self.img_transform(image)
         gt = self.gt_transform(gt)
         depth=self.depths_transform(depth)
-        
+
         return image, gt, depth
 
     def filter_files(self):
@@ -160,7 +160,7 @@ class SalObjDataset(data.Dataset):
         return self.size
 
 #dataloader for training
-def get_loader(image_root, gt_root,depth_root, batchsize, trainsize, shuffle=True, num_workers=12, pin_memory=True):
+def get_loader(image_root, gt_root, depth_root, batchsize, trainsize, shuffle=True, num_workers=12, pin_memory=True):
 
     dataset = SalObjDataset(image_root, gt_root, depth_root,trainsize)
     data_loader = data.DataLoader(dataset=dataset,
