@@ -21,7 +21,7 @@ MODELS = {
 
 LOSSES = {
     'cross-entropy': torch.nn.BCEWithLogitsLoss(),
-    'dice': loss.dice_loss()
+    'dice': loss.dice_loss
 }
 
 
