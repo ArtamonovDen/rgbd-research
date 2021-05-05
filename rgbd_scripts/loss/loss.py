@@ -16,13 +16,12 @@ def dice_loss(input, target, apply_sigmoid=True, smooth=1):
             dice_loss: the Sørensen–Dice loss.
     '''
 
-    # TODO Add batch support
-
+    batch_size = input.shape[0]
     if apply_sigmoid:
         input = torch.sigmoid(input)
 
-    input = torch.flatten(input)
-    target = torch.flatten(target)
-    intersection = (input * target).sum()
-    score = (2. * intersection + smooth)/(input.sum() + target.sum() + smooth)
+    input = input.view(batch_size, -1)
+    target = target.view(batch_size, -1)
+    intersection = (input * target).sum(1)
+    score = (2. * intersection + smooth)/(input.sum(1) + target.sum(1) + smooth)
     return 1 - score
