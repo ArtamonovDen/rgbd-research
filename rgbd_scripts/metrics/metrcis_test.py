@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import metrics as m
+from metrics import metrics as m
 
 
 class MetricsTest(unittest.TestCase):

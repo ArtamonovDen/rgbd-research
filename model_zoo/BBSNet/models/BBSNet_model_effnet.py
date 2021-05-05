@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from BBSNet.models.ResNet import ResNet50
-from torch.nn import functional as F
+from efficientnet_pytorch import EfficientNet
+
+'''
+    BBS-Net with Efficient Net as a backbone.
+
+'''
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -195,6 +199,8 @@ class aggregation_final(nn.Module):
 
         self.upsample = nn.Upsample(
             scale_factor=2, mode='bilinear', align_corners=True)
+        self.upsample4 = nn.Upsample(
+            scale_factor=4, mode='bilinear', align_corners=True)
         self.conv_upsample1 = BasicConv2d(channel, channel, 3, padding=1)
         self.conv_upsample2 = BasicConv2d(channel, channel, 3, padding=1)
         self.conv_upsample3 = BasicConv2d(channel, channel, 3, padding=1)
@@ -206,14 +212,14 @@ class aggregation_final(nn.Module):
 
     def forward(self, x1, x2, x3):
         x1_1 = x1
-        x2_1 = self.conv_upsample1(self.upsample(x1)) * x2
-        x3_1 = self.conv_upsample2(self.upsample(x1)) \
-            * self.conv_upsample3(x2) * x3
+        x2_1 = self.conv_upsample1(self.upsample(x1)) * x2 # ([1, 32, 56, 56])
+        x3_1 = self.conv_upsample1(self.upsample4(x1)) \
+            * self.conv_upsample3(self.upsample(x2)) * x3
 
         x2_2 = torch.cat((x2_1, self.conv_upsample4(self.upsample(x1_1))), 1)
         x2_2 = self.conv_concat2(x2_2)
 
-        x3_2 = torch.cat((x3_1, self.conv_upsample5(x2_2)), 1)
+        x3_2 = torch.cat((x3_1, self.conv_upsample5(self.upsample(x2_2))), 1)
         x3_2 = self.conv_concat3(x3_2)
 
         return x3_2
@@ -226,36 +232,34 @@ class Refine(nn.Module):
         super(Refine, self).__init__()
         self.upsample2 = nn.Upsample(
             scale_factor=2, mode='bilinear', align_corners=True)
+        self.upsample4 = nn.Upsample(
+            scale_factor=4, mode='bilinear', align_corners=True)
 
     def forward(self, attention, x1, x2, x3):
         # Note that there is an error in the manuscript. In the paper, the refinement strategy is depicted as ""f'=f*S1"", it should be ""f'=f+f*S1"".
-        x1 = x1+torch.mul(x1, self.upsample2(attention))
+        x1 = x1+torch.mul(x1, self.upsample4(attention))  # x1(([1, 32, 112, 112])) @ mul(torch.Size([1, 1, 56, 56]))
         x2 = x2+torch.mul(x2, self.upsample2(attention))
         x3 = x3+torch.mul(x3, attention)
 
         return x1, x2, x3
 
-# BBSNet
-
 
 class BBSNet(nn.Module):
     def __init__(self, channel=32):
         super(BBSNet, self).__init__()
-
-        # Backbone model
-        self.resnet = ResNet50('rgb')
-        self.resnet_depth = ResNet50('rgbd')
+        self.efficient_net = EfficientNet.from_pretrained('efficientnet-b0', in_channels=3)
+        self.efficient_net_depth = EfficientNet.from_pretrained('efficientnet-b0', in_channels=1)
 
         # Decoder 1
-        self.rfb2_1 = GCM(512, channel)
-        self.rfb3_1 = GCM(1024, channel)
-        self.rfb4_1 = GCM(2048, channel)
+        self.rfb2_1 = GCM(40, channel)
+        self.rfb3_1 = GCM(80, channel)
+        self.rfb4_1 = GCM(320, channel)
         self.agg1 = aggregation_init(channel)
 
         # Decoder 2
-        self.rfb0_2 = GCM(64, channel)
-        self.rfb1_2 = GCM(256, channel)
-        self.rfb5_2 = GCM(512, channel)
+        self.rfb0_2 = GCM(32, channel)
+        self.rfb1_2 = GCM(24, channel)
+        self.rfb5_2 = GCM(40, channel)
         self.agg2 = aggregation_final(channel)
 
         # upsample function
@@ -270,11 +274,11 @@ class BBSNet(nn.Module):
         self.HA = Refine()
 
         # Components of DEM module
-        self.atten_depth_channel_0 = ChannelAttention(64)
-        self.atten_depth_channel_1 = ChannelAttention(256)
-        self.atten_depth_channel_2 = ChannelAttention(512)
-        self.atten_depth_channel_3_1 = ChannelAttention(1024)
-        self.atten_depth_channel_4_1 = ChannelAttention(2048)
+        self.atten_depth_channel_0 = ChannelAttention(32)  # 64
+        self.atten_depth_channel_1 = ChannelAttention(24)  # 256 reducing dim. Problem?
+        self.atten_depth_channel_2 = ChannelAttention(40)  # 512
+        self.atten_depth_channel_3_1 = ChannelAttention(80)  # 1024
+        self.atten_depth_channel_4_1 = ChannelAttention(320)  # 2048
 
         self.atten_depth_spatial_0 = SpatialAttention()
         self.atten_depth_spatial_1 = SpatialAttention()
@@ -293,19 +297,37 @@ class BBSNet(nn.Module):
         self.out1_conv = nn.Conv2d(32*2, 1, kernel_size=1, stride=1, bias=True)
         self.out2_conv = nn.Conv2d(32*1, 1, kernel_size=1, stride=1, bias=True)
 
-        if self.training:
-            self.initialize_weights()
+        # if self.training:
+        #     self.initialize_weights()
+
+    def efficient_net_blocks_forward(self, x, start, end, drop_connect_rate):
+        for idx, block in enumerate(self.efficient_net._blocks[start:end]):
+            if drop_connect_rate:
+                # scale drop connect_rate
+                drop_connect_rate *= float(idx) / len(self.efficient_net._blocks)
+            x = block(x, drop_connect_rate=drop_connect_rate)
+        return x, drop_connect_rate
+
+    def efficient_net_depth_blocks_forward(self, x, start, end, drop_connect_rate):
+        for idx, block in enumerate(self.efficient_net_depth._blocks[start:end]):
+            if drop_connect_rate:
+                # scale drop connect_rate
+                drop_connect_rate *= float(idx) / len(self.efficient_net_depth._blocks)
+            x = block(x, drop_connect_rate=drop_connect_rate)
+        return x, drop_connect_rate
 
     def forward(self, x, x_depth):
-        x = self.resnet.conv1(x)
-        x = self.resnet.bn1(x)
-        x = self.resnet.relu(x)
-        x = self.resnet.maxpool(x)
+        self.efficient_net, self.efficient_net_depth
 
-        x_depth = self.resnet_depth.conv1(x_depth)
-        x_depth = self.resnet_depth.bn1(x_depth)
-        x_depth = self.resnet_depth.relu(x_depth)
-        x_depth = self.resnet_depth.maxpool(x_depth)
+        x = self.efficient_net._conv_stem(x)
+        # (1, 3, 224, 224))->torch.Size([1, 32, 112, 112])
+        x = self.efficient_net._bn0(x)
+        x = self.efficient_net._swish(x)
+
+        x_depth = self.efficient_net_depth._conv_stem(x_depth)
+        # (1, 2, 224, 224) -> torch.Size([1, 32, 112, 112])
+        x_depth = self.efficient_net_depth._bn0(x_depth)
+        x_depth = self.efficient_net_depth._swish(x_depth)
 
         # layer0 merge
         temp = x_depth.mul(self.atten_depth_channel_0(x_depth))
@@ -313,49 +335,65 @@ class BBSNet(nn.Module):
         x = x+temp
         # layer0 merge end
 
-        x1 = self.resnet.layer1(x)  # 256 x 64 x 64
-        x1_depth = self.resnet_depth.layer1(x_depth)
+        ##
+        # Efficient Net stages configuration
+        # TODO: configuration can be changed
+        #
+        # self.efficient_net._blocks[:3] # stage 1 и 2
+        # self.efficient_net._blocks[3:5] # stage 4
+        # self.efficient_net._blocks[5:8] # stage 5
+        # self.efficient_net._blocks[8:16] # stage 6 + 7 + 8
+        # len(self.efficient_net._blocks) -> 16
+
+        drop_connect_rate = self.efficient_net._global_params.drop_connect_rate
+        drop_connect_rate_depth = self.efficient_net_depth._global_params.drop_connect_rate
+
+        x1, drop_connect_rate = self.efficient_net_blocks_forward(x, 0, 3, drop_connect_rate)
+        x1_depth, drop_connect_rate = self.efficient_net_depth_blocks_forward(x_depth, 0, 3, drop_connect_rate_depth)
+        # x1_depth shape: torch.Size([1, 24, 56, 56]) same as x1 shape
 
         # layer1 merge
         temp = x1_depth.mul(self.atten_depth_channel_1(x1_depth))
         temp = temp.mul(self.atten_depth_spatial_1(temp))
-        x1 = x1+temp
+        x1 = x1+temp  # shape torch.Size([1, 24, 56, 56])
         # layer1 merge end
 
-        x2 = self.resnet.layer2(x1)  # 512 x 32 x 32
-        x2_depth = self.resnet_depth.layer2(x1_depth)
+        x2, drop_connect_rate = self.efficient_net_blocks_forward(x1, 3, 5, drop_connect_rate)
+        x2_depth, drop_connect_rate = self.efficient_net_depth_blocks_forward(x1_depth, 3, 5, drop_connect_rate_depth)
+        # x2 shape: torch.Size([1, 40, 28, 28])
 
         # layer2 merge
         temp = x2_depth.mul(self.atten_depth_channel_2(x2_depth))
         temp = temp.mul(self.atten_depth_spatial_2(temp))
-        x2 = x2+temp
+        x2 = x2+temp  # shape torch.Size([1, 40, 28, 28])
         # layer2 merge end
 
         x2_1 = x2
 
-        x3_1 = self.resnet.layer3_1(x2_1)  # 1024 x 16 x 16
-        x3_1_depth = self.resnet_depth.layer3_1(x2_depth)
+        x3_1, drop_connect_rate = self.efficient_net_blocks_forward(x2_1, 5, 8, drop_connect_rate)
+        x3_1_depth, drop_connect_rate = self.efficient_net_depth_blocks_forward(x2_depth, 5, 8, drop_connect_rate_depth)
+        # x3_1 shape: torch.Size([1, 80, 14, 14])
 
         # layer3_1 merge
         temp = x3_1_depth.mul(self.atten_depth_channel_3_1(x3_1_depth))
         temp = temp.mul(self.atten_depth_spatial_3_1(temp))
-        x3_1 = x3_1+temp
+        x3_1 = x3_1+temp  # x3_1 shape: torch.Size([1, 80, 14, 14])
         # layer3_1 merge end
 
-        x4_1 = self.resnet.layer4_1(x3_1)  # 2048 x 8 x 8
-        x4_1_depth = self.resnet_depth.layer4_1(x3_1_depth)
+        x4_1, drop_connect_rate = self.efficient_net_blocks_forward(x3_1, 8, 16, drop_connect_rate)
+        x4_1_depth, drop_connect_rate = self.efficient_net_depth_blocks_forward(x3_1_depth, 8, 16, drop_connect_rate_depth)
 
         # layer4_1 merge
         temp = x4_1_depth.mul(self.atten_depth_channel_4_1(x4_1_depth))
         temp = temp.mul(self.atten_depth_spatial_4_1(temp))
-        x4_1 = x4_1+temp
+        x4_1 = x4_1+temp  # ([1, 320, 7, 7])
         # layer4_1 merge end
 
         # produce initial saliency map by decoder1
         x2_1 = self.rfb2_1(x2_1)
         x3_1 = self.rfb3_1(x3_1)
         x4_1 = self.rfb4_1(x4_1)
-        attention_map = self.agg1(x4_1, x3_1, x2_1)
+        attention_map = self.agg1(x4_1, x3_1, x2_1)  # torch.Size([1, 1, 28, 28])
 
         # Refine low-layer features by initial map
         x, x1, x5 = self.HA(attention_map.sigmoid(), x, x1, x2)
@@ -364,13 +402,14 @@ class BBSNet(nn.Module):
         x0_2 = self.rfb0_2(x)
         x1_2 = self.rfb1_2(x1)
         x5_2 = self.rfb5_2(x5)
-        y = self.agg2(x5_2, x1_2, x0_2)  # *4
+        y = self.agg2(x5_2, x1_2, x0_2)
+
 
         # PTM module
         y = self.agant1(y)
-        y = self.deconv1(y)
-        y = self.agant2(y)
-        y = self.deconv2(y)
+        y = self.deconv1(y)  # 112->224
+        y = self.agant2(y)  # 224
+        # y = self.deconv2(y) # 224 -> 448 TODO last deconvolution removed
         y = self.out2_conv(y)
 
         return self.upsample(attention_map), y
@@ -411,6 +450,7 @@ class BBSNet(nn.Module):
         return nn.Sequential(*layers)
 
     # initialize the weights
+
     def initialize_weights(self):
         res50 = models.resnet50(pretrained=True)
         pretrained_dict = res50.state_dict()

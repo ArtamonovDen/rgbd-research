@@ -10,14 +10,18 @@ from datetime import datetime
 
 
 from model_zoo.BBSNet.models.BBSNet_model import BBSNet
+from model_zoo.BBSNet.models.BBSNet_model_effnet import BBSNet as BBSNet_effnet
 from model_zoo.BBSNet import bbs_utils, data
+from loss import loss
 
 MODELS = {
-    'BBS-Net': BBSNet()
+    'BBS-Net': BBSNet,
+    'BBS-Net-Effnet': BBSNet_effnet
 }
 
 LOSSES = {
-    'cross-entropy': torch.nn.BCEWithLogitsLoss()
+    'cross-entropy': torch.nn.BCEWithLogitsLoss(),
+    'dice': loss.dice_loss()
 }
 
 
@@ -47,9 +51,9 @@ def validate(model, val_dataset, device, epoch):
             _, res = model(image, depth)
 
             res = F.upsample(res, size=gt.shape,
-                             mode='bilinear', align_corners=False)  # TODO mpve to separate method
+                             mode='bilinear', align_corners=False)  # TODO move to separate method
             res = res.sigmoid().data.cpu().numpy().squeeze()
-            res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+            res = (res - res.min()) / (res.max() - res.min() + 1e-8) # TODO why?
 
             mae_sum += np.sum(np.abs(res-gt))*1.0/(gt.shape[0]*gt.shape[1])
 
@@ -125,7 +129,7 @@ def main(args_):
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
-    model = MODELS.get(model_name).to(device)
+    model = MODELS.get(model_name)().to(device)
     loss = LOSSES.get(args_.loss)
     optimizer = torch.optim.Adam(model.parameters(), lr)
 
