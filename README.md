@@ -33,6 +33,8 @@ Run evaluation script with calcualtion F score and MAE
 
 ### BBS-Net
 
+#### experiment ID: 0**
+
 | Dataset    | MAE   | F-Score |
 |------------|-------|---------|
 | NJU2K_TEST | 0.036 | 0.903   |
@@ -41,3 +43,17 @@ Run evaluation script with calcualtion F score and MAE
 | SSD        | 0.047 | 0.837   |
 | LFSD       | 0.073 | 0.846   |
 | SIP        | 0.047 | 0.869   |
+
+### BBS-Net with efficient net b-0
+
+#### experiment ID: 1**
+
+| Dataset    | MAE    | F-Score |
+|------------|--------|---------|
+| STERE      | 0.044  | 0.877   |
+| NJU2K_TEST | 0.0365 | 0.897   |
+| NLPR_TEST  | 0.040  | 0.832   |
+| DES        | 0.019  | 0.915   |
+| SSD        | 0.048  | 0.837   |
+| LFSD       | 0.076  | 0.845   |
+| SIP        | 0.051  | 0.860   |

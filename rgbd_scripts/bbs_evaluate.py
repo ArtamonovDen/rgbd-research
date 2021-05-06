@@ -22,6 +22,7 @@ TEST_DATASETS = ['STERE', 'NJU2K_TEST',
 def init_wnb_config(args_):
     return dict(
         wandb_project=args_.wandb_project,
+        experiment_id=args_.experiment_id,
         model_name=args_.model,
         input_size=args_.input_size
     )
@@ -94,8 +95,11 @@ def main(args_):
                 total_mae += mae
                 total_f1 += f1
 
-            logging.info(f'[{dataset}] Average f1 is {total_f1 / test_loader.size}')
-            logging.info(f'[{dataset}] Average mae is {total_mae / test_loader.size}')
+            logging.info(f'[{dataset}] Average f1 is {total_f1 / test_loader.size:.3f}')
+            logging.info(f'[{dataset}] Average mae is {total_mae / test_loader.size:.3f}')
+
+            # TODO create by-experiment table
+            # TODO add results to all experiments table
 
 
 if __name__ == '__main__':
@@ -113,6 +117,8 @@ if __name__ == '__main__':
                         default='BBS-Net', help='Model name')
     parser.add_argument('--model-path', type=str,
                         default='', help='Path to model to evaluate')
+    parser.add_argument('--experiment-id', type=str,
+                        default='-1', help='Experiment id to save it with')
     parser.add_argument('--wandb-project', type=str,
                         default='BBS-Net Evaluation', help='Name of the WandB project')
 
