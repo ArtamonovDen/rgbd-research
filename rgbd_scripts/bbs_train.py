@@ -6,6 +6,7 @@ import torch
 import wandb
 import numpy as np
 import torch.nn.functional as F
+import torch.nn as nn
 from datetime import datetime
 
 
@@ -20,7 +21,7 @@ MODELS = {
 }
 
 LOSSES = {
-    'cross-entropy': torch.nn.BCEWithLogitsLoss(),
+    'cross-entropy': nn.BCEWithLogitsLoss(),
     'dice': loss.dice_loss
 }
 

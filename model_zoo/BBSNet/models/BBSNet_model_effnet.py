@@ -317,7 +317,6 @@ class BBSNet(nn.Module):
         return x, drop_connect_rate
 
     def forward(self, x, x_depth):
-        self.efficient_net, self.efficient_net_depth
 
         x = self.efficient_net._conv_stem(x)
         # (1, 3, 224, 224))->torch.Size([1, 32, 112, 112])
