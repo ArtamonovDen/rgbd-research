@@ -144,7 +144,7 @@ def main(args_):
     wandb_config = init_wnb_config(args_)
 
     with wandb.init(project=wandb_config['wandb_project'], config=wandb_config):
-        wandb.watch(model, loss_funciton, log='all')
+        wandb.watch(model, log='all')
         logging.info('Start training...')
 
         best_mae = 0.0
