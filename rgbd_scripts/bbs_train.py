@@ -101,7 +101,7 @@ def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_func
         loss2 = loss_function(s2, gts)
         loss_total = loss1+loss2
 
-        loss.backward()
+        loss_function.backward()
         bbs_utils.clip_gradient(optimizer, clip_grad)
         optimizer.step()
 
