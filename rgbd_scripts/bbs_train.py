@@ -87,7 +87,7 @@ def log_step(loss1, loss2, loss, cur_step, total_step, cur_epoch):
         {'loss1': loss1, 'loss2': loss2, 'loss': loss})
 
 
-def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_f, clip_grad):
+def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_function, clip_grad):
 
     model.train()
     loss_over_epoch = 0.0
@@ -97,18 +97,18 @@ def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_f, c
         images, gts, depths = images.to(device), gts.to(
             device), depths.to(device)  # TODO Make in dataloader
         s1, s2 = model(images, depths)
-        loss1 = loss_f(s1, gts)
-        loss2 = loss_f(s2, gts)
-        loss = loss1+loss2
+        loss1 = loss_function(s1, gts)
+        loss2 = loss_function(s2, gts)
+        loss_total = loss1+loss2
 
-        loss.backward()
+        loss_total.backward()
         bbs_utils.clip_gradient(optimizer, clip_grad)
         optimizer.step()
 
-        loss_over_epoch += loss.data
+        loss_over_epoch += loss_total.data
 
         if i % 100 == 0 or i == len(train_dataloader) or i == 0:
-            log_step(loss1.data, loss2.data, loss.data, i, len(train_dataloader), cur_epoch)
+            log_step(loss1.data, loss2.data, loss_total.data, i, len(train_dataloader), cur_epoch)
 
     return loss_over_epoch / len(train_dataloader)
 
@@ -131,7 +131,7 @@ def main(args_):
     device = torch.device(device)
 
     model = MODELS.get(model_name)().to(device)
-    loss = LOSSES.get(args_.loss)
+    loss_funciton = LOSSES.get(args_.loss)
     optimizer = torch.optim.Adam(model.parameters(), lr)
 
     train_dataloader = data.get_loader(args_.rgb_path, args_.gt_path, args_.depth_path,
@@ -144,7 +144,7 @@ def main(args_):
     wandb_config = init_wnb_config(args_)
 
     with wandb.init(project=wandb_config['wandb_project'], config=wandb_config):
-        wandb.watch(model, loss, log="all")
+        wandb.watch(model, log='all')
         logging.info('Start training...')
 
         best_mae = 0.0
@@ -158,11 +158,11 @@ def main(args_):
             wandb.log({'lr': cur_lr})
 
             # Training epoch
-            ave_loss = train_epoch(
-                model, epoch, optimizer, train_dataloader, device, loss, clip_grad)
+            epoch_loss = train_epoch(
+                model, epoch, optimizer, train_dataloader, device, loss_funciton, clip_grad)
             logging.info(
-                f'Epoch {epoch}/{epoch_num}, Average loss: {ave_loss:.4f}')
-            wandb.log({'avg-loss': ave_loss, 'epoch': epoch})
+                f'Epoch {epoch}/{epoch_num}, Epoch loss: {epoch_loss:.4f}')
+            wandb.log({'loss-over-epoch': epoch_loss, 'epoch': epoch})
 
             # Save model state
             if (epoch) % 10 == 0:
