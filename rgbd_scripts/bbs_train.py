@@ -13,7 +13,8 @@ from datetime import datetime
 from model_zoo.BBSNet.models.BBSNet_model import BBSNet
 from model_zoo.BBSNet.models.BBSNet_model_effnet import BBSNet as BBSNet_effnet
 from model_zoo.BBSNet import bbs_utils, data
-from loss import loss
+from losses.dice_loss import DiceLoss
+
 
 MODELS = {
     'BBS-Net': BBSNet,
@@ -22,7 +23,7 @@ MODELS = {
 
 LOSSES = {
     'cross-entropy': nn.BCEWithLogitsLoss(),
-    'dice': loss.dice_loss
+    'dice': DiceLoss(smooth=0.0)
 }
 
 
