@@ -13,7 +13,8 @@ from datetime import datetime
 from model_zoo.BBSNet.models.BBSNet_model import BBSNet
 from model_zoo.BBSNet.models.BBSNet_model_effnet import BBSNet as BBSNet_effnet
 from model_zoo.BBSNet import bbs_utils, data
-from loss import loss
+from losses.dice_loss import DiceLoss
+
 
 MODELS = {
     'BBS-Net': BBSNet,
@@ -22,7 +23,7 @@ MODELS = {
 
 LOSSES = {
     'cross-entropy': nn.BCEWithLogitsLoss(),
-    'dice': loss.dice_loss
+    'dice': DiceLoss(apply_sigmoid=True, smooth=0.0)
 }
 
 
@@ -36,7 +37,8 @@ def init_wnb_config(args_):
         batch_size=args_.batch_size,
         clip=args_.clip,
         decay_rate=args_.decay_rate,
-        decay_epoch=args_.decay_epoch
+        decay_epoch=args_.decay_epoch,
+        comment=args_.comment or ''
     )
 
 
@@ -54,7 +56,8 @@ def validate(model, val_dataset, device, epoch):
             res = F.upsample(res, size=gt.shape,
                              mode='bilinear', align_corners=False)  # TODO move to separate method
             res = res.sigmoid().data.cpu().numpy().squeeze()
-            res = (res - res.min()) / (res.max() - res.min() + 1e-8) # TODO why?
+            res = (res - res.min()) / (res.max() -
+                                       res.min() + 1e-8)  # TODO why?
 
             mae_sum += np.sum(np.abs(res-gt))*1.0/(gt.shape[0]*gt.shape[1])
 
@@ -108,14 +111,17 @@ def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_func
         loss_over_epoch += loss_total.data
 
         if i % 100 == 0 or i == len(train_dataloader) or i == 0:
-            log_step(loss1.data, loss2.data, loss_total.data, i, len(train_dataloader), cur_epoch)
+            log_step(loss1.data, loss2.data, loss_total.data,
+                     i, len(train_dataloader), cur_epoch)
 
     return loss_over_epoch / len(train_dataloader)
 
 
 def make_checkpoints_dir(save_path):
 
-    os.mkdir(save_path + datetime.now().strftime('%Y%m%d'))
+    save_path = save_path + datetime.now().strftime('%Y-%m-%d-%H:%M:%S.')
+    os.mkdir(save_path)
+    return save_path
 
 
 def main(args_):
@@ -139,7 +145,7 @@ def main(args_):
     val_dataset = data.test_dataset(
         args_.val_rgb_path, args_.val_gt_path, args_.val_depth_path, args_.input_size)
 
-    make_checkpoints_dir(save_path)
+    save_path = make_checkpoints_dir(save_path)
 
     wandb_config = init_wnb_config(args_)
 
@@ -184,6 +190,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BBS models train script')
 
     parser.add_argument('--epoch', type=int, default=200, help='Epoch number')
+    parser.add_argument('--comment', type=str,
+                        help='Optional description of the train')
     parser.add_argument('--model', type=str,
                         default='BBS-Net', help='Model name to train')
     parser.add_argument('--loss', type=str,
