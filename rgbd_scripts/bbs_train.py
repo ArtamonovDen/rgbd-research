@@ -78,7 +78,8 @@ def update_best_mae(val_mae, best_mae, best_epoch, model, save_path, model_name,
         best_epoch = epoch
         logging.info(
             f'Best MAE was updated. Best MAE: {best_mae}. Best epoch: {best_epoch}. Saving best model')
-        torch.save(model.state_dict(), save_path + f'{model_name}_best.pth')
+        wandb.log({'Best model update epoch': epoch})
+        torch.save(model.state_dict(), save_path + f'/{model_name}_best.pth')
 
     return best_mae, best_epoch
 
@@ -119,7 +120,7 @@ def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_func
 
 def make_checkpoints_dir(save_path):
 
-    save_path = save_path + datetime.now().strftime('%Y-%m-%d-%H:%M:%S.')
+    save_path = f"{save_path}_{datetime.now().strftime('%Y-%m-%d-%H:%M:%S.')}/"
     os.mkdir(save_path)
     return save_path
 
@@ -137,6 +138,10 @@ def main(args_):
     device = torch.device(device)
 
     model = MODELS.get(model_name)().to(device)
+    if args_.from_checkpoint:
+        model.load_state_dict(torch.load(args_.from_checkpoint))
+        logging.info('Load model from checkpoint f {args_.from_checkpoint}')
+
     loss_funciton = LOSSES.get(args_.loss)
     optimizer = torch.optim.Adam(model.parameters(), lr)
 
@@ -190,6 +195,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='BBS models train script')
 
     parser.add_argument('--epoch', type=int, default=200, help='Epoch number')
+    parser.add_argument('--from-checkpoint', type=str,
+                        help='Use this flag to continue training from checkpoint')
     parser.add_argument('--comment', type=str,
                         help='Optional description of the train')
     parser.add_argument('--model', type=str,
