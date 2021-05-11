@@ -79,7 +79,7 @@ def update_best_mae(val_mae, best_mae, best_epoch, model, save_path, model_name,
         logging.info(
             f'Best MAE was updated. Best MAE: {best_mae}. Best epoch: {best_epoch}. Saving best model')
         wandb.log({'Best model update epoch': epoch})
-        torch.save(model.state_dict(), save_path + f'/{model_name}_best.pth')
+        torch.save(model.state_dict(), save_path + f'{model_name}_best.pth')
 
     return best_mae, best_epoch
 

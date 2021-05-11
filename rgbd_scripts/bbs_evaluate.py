@@ -9,10 +9,12 @@ import torch.nn.functional as F
 from metrics import metrics
 
 from model_zoo.BBSNet.models.BBSNet_model import BBSNet
+from model_zoo.BBSNet.models.BBSNet_model_effnet import BBSNet as BBSNet_effnet
 from model_zoo.BBSNet import data
 
 MODELS = {
-    'BBS-Net': BBSNet()
+    'BBS-Net': BBSNet(),
+    'BBS-Net-Effnet': BBSNet_effnet()
 }
 
 TEST_DATASETS = ['STERE', 'NJU2K_TEST',
@@ -30,7 +32,7 @@ def init_wnb_config(args_):
 
 def prepare_model(model_name, model_path, device):
 
-    model = MODELS.get(model_name).to(device)
+    model = MODELS.get(model_name)
     model.load_state_dict(torch.load(model_path))
     model.to(device)
     model.eval()
