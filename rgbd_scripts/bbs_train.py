@@ -14,6 +14,7 @@ from model_zoo.BBSNet.models.BBSNet_model import BBSNet
 from model_zoo.BBSNet.models.BBSNet_model_effnet import BBSNet as BBSNet_effnet
 from model_zoo.BBSNet import bbs_utils, data
 from losses.dice_loss import DiceLoss
+from losses.focal_loss import FocalLoss
 
 
 MODELS = {
@@ -23,7 +24,9 @@ MODELS = {
 
 LOSSES = {
     'cross-entropy': nn.BCEWithLogitsLoss(),
-    'dice': DiceLoss(apply_sigmoid=True, smooth=0.0)
+    'dice': DiceLoss(apply_sigmoid=True, smooth=0.0),
+    'focal': FocalLoss(apply_sigmoid=True, alpha=0.8, gamma=2)
+
 }
 
 
