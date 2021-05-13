@@ -2,6 +2,7 @@ import unittest
 import torch
 from losses.dice_loss import DiceLoss
 from losses.focal_loss import FocalLoss
+from losses.jaccard_loss import JaccardLoss
 
 
 class LossTest(unittest.TestCase):
@@ -73,6 +74,21 @@ class LossTest(unittest.TestCase):
         loss = FocalLoss(apply_sigmoid=False)
         ret_loss = loss(self.just_input, self.target)
         self.assertEqual(17, int(ret_loss.item()))
+
+    def test_jaccard_loss_with_gt_inut(self):
+        loss = JaccardLoss(apply_sigmoid=False)
+        ret_loss = loss(self.gt_input, self.target)
+        self.assertAlmostEqual(0, ret_loss.item())
+
+    def test_jaccard_loss_with_wrong_inut(self):
+        loss = JaccardLoss(apply_sigmoid=False)
+        ret_loss = loss(self.fully_wrong_input, self.target)
+        self.assertAlmostEqual(1, ret_loss.item())
+
+    def test_jaccard_loss(self):
+        loss = JaccardLoss(apply_sigmoid=False)
+        ret_loss = loss(self.just_input, self.target)
+        self.assertAlmostEqual(0.4, ret_loss.item())
 
 
 if __name__ == '__main__':

@@ -24,8 +24,8 @@ class FocalLoss(nn.Module):
     def __init__(
         self,
         apply_sigmoid: bool = True,
-        alpha=0.8,
-        gamma=2.0
+        alpha: float = 0.8,
+        gamma: float = 2.0
     ):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
