@@ -83,7 +83,7 @@ def update_best_mae(val_mae, best_mae, best_epoch, model, save_path, model_name,
         best_epoch = epoch
         logging.info(
             f'Best MAE was updated. Best MAE: {best_mae}. Best epoch: {best_epoch}. Saving best model')
-        wandb.log({'Best model update epoch': epoch})
+        wandb.log({'Best model update epoch': epoch, 'Best mae update': best_mae})
         torch.save(model.state_dict(), save_path + f'{model_name}_best.pth')
 
     return best_mae, best_epoch
@@ -125,7 +125,7 @@ def train_epoch(model, cur_epoch, optimizer, train_dataloader, device, loss_func
 
 def make_checkpoints_dir(save_path):
 
-    save_path = f"{save_path}_{datetime.now().strftime('%Y-%m-%d-%H:%M:%S.')}/"
+    save_path = f"{save_path}{datetime.now().strftime('%Y-%m-%d-%H:%M:%.')}/"
     os.mkdir(save_path)
     return save_path
 
