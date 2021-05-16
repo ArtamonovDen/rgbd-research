@@ -18,7 +18,7 @@ MODELS = {
 }
 
 TEST_DATASETS = ['STERE', 'NJU2K_TEST',
-                 'NLPR_TEST', 'DES', 'SSD', 'LFSD', 'DUT-RGBD', 'SIP']
+                 'NLPR_TEST', 'NLPR', 'DES', 'SSD', 'LFSD', 'DUT-RGBD', 'SIP']
 
 
 def init_wnb_config(args_):
