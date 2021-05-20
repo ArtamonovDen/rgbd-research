@@ -17,8 +17,10 @@ MODELS = {
     'BBS-Net-Effnet': BBSNet_effnet()
 }
 
-TEST_DATASETS = ['STERE', 'NJU2K_TEST',
-                 'NLPR_TEST', 'NLPR', 'DES', 'SSD', 'LFSD', 'DUT-RGBD', 'SIP']
+# TEST_DATASETS = ['STERE', 'NJU2K_TEST',
+#                  'NLPR_TEST', 'NLPR', 'DES', 'SSD', 'LFSD', 'DUT-RGBD', 'SIP']
+
+TEST_DATASETS = ['NLPR', 'DUT-RGBD']
 
 
 def init_wnb_config(args_):
