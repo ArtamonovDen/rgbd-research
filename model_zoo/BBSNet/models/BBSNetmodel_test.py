@@ -9,8 +9,8 @@ class BBSModelTest(unittest.TestCase):
         return super().setUp()
 
     def test_efficientnet_backbone(self):
-        x = torch.randn((2, 3, 224, 224))
-        x_depth = torch.randn((2, 1, 224, 224))
+        x = torch.randn((2, 3, 352, 352))
+        x_depth = torch.randn((2, 1, 352, 352))
 
         model = BBSNetEffnet()
         model.eval()
